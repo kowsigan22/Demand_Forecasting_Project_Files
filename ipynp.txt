@@ -1,0 +1,127 @@
+cell 1:
+
+
+
+import pandas as pd
+from sklearn.preprocessing import LabelEncoder
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+data_1=pd.read_csv('McKesson_Large_Demand_Forecasting_Dataset.csv')
+data_2=pd.read_csv('daily_dataset_2023.csv')
+data_1.drop(columns=['product_id','region'], inplace=True)
+# data_1['date']=pd.to_datetime(data_1['date'])
+# data_2['date']=pd.to_datetime(data_1['date'])
+data_1['month_day'] = data_1['date'].str[5:10]
+data_2['month_day'] = data_2['date'].str[5:10]
+merged_df = pd.merge(data_1, data_2[['month_day', 'season']], 
+                     on='month_day', 
+                     how='left')
+merged_df['date']=pd.to_datetime(merged_df['date'])
+print(merged_df.columns)
+print(merged_df['month_day'])
+merged_df['month_day']=merged_df['month_day'].str[3:5].astype(int)
+merged_df['day_of_week'] = merged_df['date'].dt.weekday        # 0=Monday, 6=Sunday
+merged_df['week_of_month'] = merged_df['date'].apply(lambda d: (d.day-1)//7 + 1)
+merged_df['month'] = merged_df['date'].dt.month
+merged_df['is_weekend'] = (merged_df['day_of_week'] >= 5).astype(int)
+merged_df['lag_1'] = merged_df['units_sold'].shift(1)   
+merged_df['lag_7'] = merged_df['units_sold'].shift(7)
+merged_df['roll_mean_7'] = merged_df['units_sold'].shift(1).rolling(7).mean()
+merged_df['roll_std_7']  = merged_df['units_sold'].shift(1).rolling(7).std()
+merged_df['roll_sum_30'] = merged_df['units_sold'].shift(1).rolling(30).sum()
+missing_count = merged_df['units_sold'].isnull().sum()
+print(missing_count)
+print(merged_df['month_day'].head(100))
+for col in ['product_name','category','flu_alert_level','season']:
+    if col in merged_df.columns:
+        le = LabelEncoder()
+        merged_df[col] = le.fit_transform(merged_df[col].astype(str))
+        print("Mapping:", dict(zip(le.classes_, le.transform(le.classes_))))
+        print(missing_count)
+
+print(merged_df['month'].tail(100))
+
+
+# le_1 = LabelEncoder()
+# le_2 = LabelEncoder()
+# merged_df['medicine_type_encoded'] = le_1.fit_transform(merged_df['product_name'])
+# merged_df['category_encoded'] = le_2.fit_transform(merged_df['category'])
+
+# merged_df.drop(columns=['date'], inplace=True)
+print(merged_df.columns)
+# print(merged_df['roll_mean_7'].head(10))
+# print(merged_df['medicine_type_encoded'])
+# print("Mapping:", dict(zip(le_1.classes_, le_1.transform(le_1.classes_))))
+# print(merged_df['medicine_type_encoded'])
+# print("Mapping:", dict(zip(le_2.classes_, le_2.transform(le_2.classes_))))
+plt.figure(figsize=(8,6))
+sns.boxplot(x='product_name', y='units_sold', data=merged_df)
+plt.title("Demand distribution by Medicine Type")
+plt.show()
+
+
+
+
+
+
+cell 2:
+# merged_df = merged_df.sort_values('date').reset_index(drop=True)
+from xgboost import XGBRegressor
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+import numpy as np
+import matplotlib.pyplot as plt
+
+cutoff = int(len(merged_df) * 0.8)
+Amoxicillin_500mg_Data=merged_df.loc
+train = merged_df.iloc[:cutoff]
+test  = merged_df.iloc[cutoff:]
+features = [ 'product_name', 'category', 'unit_price',
+       'market_trend_index', 'is_holiday', 'flu_alert_level', 'economic_index',
+       'month_day', 'season', 'day_of_week', 'week_of_month', 'month',
+       'is_weekend', 'lag_1', 'lag_7', 'roll_mean_7', 'roll_std_7',
+       'roll_sum_30']
+X_train, y_train = train[features], train['units_sold']
+X_test,  y_test  = test[features],  test['units_sold']
+model = XGBRegressor(
+    n_estimators=300,
+    learning_rate=0.05,
+    max_depth=6,
+    subsample=0.8,
+    colsample_bytree=0.8,
+    reg_lambda=1.0,
+    random_state=42
+)
+model.fit(X_train, y_train)
+
+pred = model.predict(X_test)
+print(pred)
+
+mae = mean_absolute_error(y_test, pred)
+rmse = np.sqrt(mean_squared_error(y_test, pred))
+print(f"MAE: {mae:.2f} | RMSE: {rmse:.2f}")
+
+plt.figure(figsize=(10,4))
+plt.plot(test['date'], y_test - pred, label='Residuals')
+plt.axhline(0, color='red', linestyle='--')
+plt.title("Residuals over time")
+plt.legend()
+plt.show()
+
+target_value = 0
+selected_columns = ['flu_alert_level', 'product_name','units_sold']
+new_dataset = merged_df.loc[merged_df['product_name'] == target_value, selected_columns]
+print(new_dataset)
+
+# df_grouped = merged_df.groupby(['product_name','date']).agg({'units_sold':'sum'}).reset_index()
+plt.figure(figsize=(12,6))
+sns.scatterplot(data=new_dataset, x='flu_alert_level', y='units_sold', hue='product_name')
+plt.title("Demand spikes per medicine type over time")
+plt.show()
+
+
+
+
+
+
+
