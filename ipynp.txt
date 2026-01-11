@@ -17,6 +17,7 @@ data_2['month_day'] = data_2['date'].str[5:10]
 merged_df = pd.merge(data_1, data_2[['month_day', 'season']], 
                      on='month_day', 
                      how='left')
+merged_df['month_And_day_of_month'] = merged_df['month_day']
 merged_df['month_And_day'] = merged_df['date'].str[0:7]
 # print(merged_df['month_And_day'])
 
@@ -76,6 +77,9 @@ plt.figure(figsize=(8,6))
 sns.boxplot(x='product_name', y='units_sold', data=merged_df_label_encoded)
 plt.title("Demand distribution by Medicine Type")
 plt.show()
+print(merged_df_label_encoded['week_of_month'].unique())
+
+
 
 
 
@@ -87,7 +91,6 @@ plt.show()
 cell 2:
 
 
-# merged_df = merged_df.sort_values('date').reset_index(drop=True)
 def inv_boxcox(y_transformed, lambda_value):
     if lambda_value == 0:
         return np.exp(y_transformed)
@@ -99,6 +102,7 @@ from sklearn.preprocessing import StandardScaler
 from lightgbm import LGBMRegressor
 from sklearn.model_selection import GridSearchCV, TimeSeriesSplit
 from prophet import Prophet
+from joblib import dump
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 import numpy as np
@@ -279,6 +283,12 @@ xg_model_surgical_masks_box_K_fold = XGBRegressor(
     objective="reg:squarederror",
     random_state=42
       )
+medicine_averagedf = None
+# atorvastatin_averagedf = pd.DataFrame()
+# insuline_glargine_averagedf = pd.DataFrame()
+# surgial_gloves_averagedf = pd.DataFrame()
+# surgical_masks_averagedf = pd.DataFrame()
+
 
 
 my_dict = {'Amoxicillin 500mg': 0, "Atorvastatin 20mg": 1, "Insulin Glargine 10ml": 2,"Surgical Gloves Box":3,"Surgical Masks Box":4}
@@ -294,14 +304,31 @@ for key, value in my_dict.items():
     # print(new_dataset.head(10))
     # average_df = new_dataset.groupby(['month_And_day', 'week_of_month'],as_index=False).mean()
     average_df = new_dataset.groupby(['month_And_day', 'week_of_month']).agg(
-    {'date': 'first', 'product_name': 'mean', 'category': 'mean', 'units_sold': 'mean', 'unit_price': 'mean',
+    {  'date': 'first', 'product_name': 'mean', 'category': 'mean', 'units_sold': 'mean', 'unit_price': 'mean',
        'market_trend_index': 'mean', 'is_holiday': 'mean', 'flu_alert_level': 'mean', 'economic_index': 'mean',
        'month_day': 'mean', 'season': 'mean', 'day_of_week': 'mean',  'month': 'mean',
        'is_weekend': 'mean', 'lag_1': 'mean', 'lag_7': 'mean', 'roll_mean_7': 'mean', 'roll_std_7': 'mean',
        'roll_sum_30': 'mean','medicine_season': 'mean','medicine_flu': 'mean'})
+    print(average_df.head(20))
+    print(average_df.dtypes)
+    
+    # print(average_df.columns)
+    
 
 
     result_df = average_df.reset_index()
+    medicine_averagedf = result_df.copy()
+    # if key == "Amoxicillin 500mg":
+    #     medicine_averagedf = result_df.copy()
+    #     # print(amoxicillin_averagedf.columns)
+    # elif key == "Atorvastatin 20mg":
+    #     atorvastatin_averagedf = result_df.copy()
+    # elif key == "Insulin Glargine 10ml":
+    #     insuline_glargine_averagedf = result_df.copy()
+    # elif key == "Surgical Gloves Box":
+    #     surgial_gloves_averagedf = result_df.copy()
+    # elif key == "Surgical Masks Box":
+    #     surgical_masks_averagedf = result_df.copy()
     # print(result_df.columns)
     # print(result_df.count)
     cutoff = int(len(result_df) * 0.8)
@@ -323,6 +350,8 @@ for key, value in my_dict.items():
     # print("columns to drop due to high correlation:")
     # print(to_drop)
     y_train_transformed, lambda_value = stats.boxcox(y_train)
+    print("Lambda value for Box-Cox transformation:")
+    print(lambda_value)
     y_train_transformed_log = np.log1p(y_train)
     if value == 0:
           plt.figure(figsize=(12, 8))
@@ -345,6 +374,9 @@ for key, value in my_dict.items():
         mae = mean_absolute_error(y_test, y_pred)
         rmse = np.sqrt(mean_squared_error(y_test, y_pred))
         mape = np.mean(np.abs((y_test - y_pred) / y_test)) * 100
+        X_realtime = X_test.tail(1)
+        pred = rf_model_amoxicillin.predict(X_realtime)
+        print()
         print("Random Forest Model "+f"MAE: {mae:.2f} | RMSE: {rmse:.2f}" + " | MAPE:", mape)
 
         plt.figure(figsize=(10,4))
@@ -360,6 +392,26 @@ for key, value in my_dict.items():
         plt.title("Residuals over time")
         plt.legend()
         plt.show()
+        X_realtime = pd.DataFrame([{
+        'flu_alert_level': 0.5714285714285714,
+        'season': 2.0,
+        'week_of_month': 1,
+        'month': 3.0,
+        'lag_1': 996.2857142857144,
+        'lag_7': 979.7142857142856,
+        'roll_mean_7': 1005.5,
+        'roll_std_7': 274.5454059020204,
+        
+        }])
+
+        # X_realtime = X_realtime[artifact['feature_names']]
+        pred_0 = rf_model_amoxicillin.predict(X_realtime)
+        # pred = rf_model_amoxicillin.predict([[0.5714285714285714, 2.0, 1,
+        #                                    3.0,
+        #                                    996.2857142857144, 979.7142857142856,
+        #                                    1005.5, 274.5454059020204 ]])
+        pred_inv = inv_boxcox(pred_0, lambda_value)
+        print(pred_inv)
         tscv_xg = TimeSeriesSplit(n_splits=3)
         x = result_df[[
         'flu_alert_level'
@@ -636,6 +688,13 @@ for key, value in my_dict.items():
         print("Average RMSE:", np.mean(rmse_scores))
         print("Average MAPE:", np.mean(mape_scores))
         
+
+   
+dump(rf_model_amoxicillin, "rf_model_amoxicillin.joblib")
+dump(rf_model_atorvastatin, "rf_model_atorvastatin.joblib")
+dump(lgb_model_insulin_glargine, "lgb_model_insulin_glargine.joblib")
+dump(lgb_model_surgical_gloves_box, "trained_model.joblib")
+dump(xg_model_surgical_masks_box, "trained_model.joblib")        
 
 
 
