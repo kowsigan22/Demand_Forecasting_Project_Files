@@ -88,9 +88,12 @@ print(merged_df_label_encoded['week_of_month'].unique())
 
 
 
+
+
 cell 2:
 
 
+# merged_df = merged_df.sort_values('date').reset_index(drop=True)
 def inv_boxcox(y_transformed, lambda_value):
     if lambda_value == 0:
         return np.exp(y_transformed)
@@ -410,8 +413,8 @@ for key, value in my_dict.items():
         #                                    3.0,
         #                                    996.2857142857144, 979.7142857142856,
         #                                    1005.5, 274.5454059020204 ]])
-        pred_inv = inv_boxcox(pred_0, lambda_value)
-        print(pred_inv)
+        # pred_inv = inv_boxcox(pred_0, lambda_value)
+        # print(pred_inv)
         tscv_xg = TimeSeriesSplit(n_splits=3)
         x = result_df[[
         'flu_alert_level'
@@ -453,6 +456,7 @@ for key, value in my_dict.items():
         pred = rf_model_atorvastatin.predict(X_test)
         y_pred = inv_boxcox(pred, lambda_value)
         y_pred_rf= y_pred.copy()
+        print(y_pred_rf)
         mae = mean_absolute_error(y_test, y_pred)
         rmse = np.sqrt(mean_squared_error(y_test, y_pred))
         mape = np.mean(np.abs((y_test - y_pred) / y_test)) * 100
@@ -471,7 +475,14 @@ for key, value in my_dict.items():
         plt.title("Residuals over time")
         plt.legend()
         plt.show()
-
+        
+        pred = rf_model_amoxicillin.predict([[0.5714285714285714, 2.0, 1,
+                                           3.0,
+                                           996.2857142857144, 979.7142857142856,
+                                           1005.5, 274.5454059020204 ]])
+        print(pred)
+        pred_inv = inv_boxcox(pred, lambda_value)
+        print(pred_inv)
         tscv_xg = TimeSeriesSplit(n_splits=3)
         x = result_df[[
         'flu_alert_level'
@@ -583,7 +594,7 @@ for key, value in my_dict.items():
         plt.title("Residuals: Light GBM")
 
         plt.figure(figsize=(10,4))
-        plt.plot(test['date'], y_test - y_pred, label='Residuals_LGBM')
+        plt.plot(test['date'], y_test - y_pred_lgb, label='Residuals_LGBM')
         plt.axhline(0, color='red', linestyle='--')
         plt.title("Residuals over time")
         plt.legend()
@@ -627,6 +638,7 @@ for key, value in my_dict.items():
         
     else:
         xg_model_surgical_masks_box.fit(X_train, y_train_transformed)
+        print(xg_model_surgical_masks_box.feature_names_in_)
         pred = xg_model_surgical_masks_box.predict(X_test)
         y_pred = inv_boxcox(pred, lambda_value)
         y_pred_xg = y_pred.copy()
@@ -648,6 +660,21 @@ for key, value in my_dict.items():
         plt.title("Residuals over time")
         plt.legend()
         plt.show()
+       
+        X_new = pd.DataFrame({
+            'flu_alert_level': [0.5714285714285714],
+            'season': [2.0],
+            'week_of_month': [1],
+            'month': [3.0],
+            'lag_1': [996.2857142857144],
+            'lag_7': [979.7142857142856],
+            'roll_mean_7': [1005.5],
+            'roll_std_7': [274.5454059020204]
+           })
+        lambda_value=1.5069560616989914
+        pred = xg_model_surgical_masks_box.predict(X_new)
+        pred = inv_boxcox(pred, lambda_value)
+        print(pred)
         tscv_xg = TimeSeriesSplit(n_splits=3)
         x = result_df[[
         'flu_alert_level'
@@ -693,8 +720,8 @@ for key, value in my_dict.items():
 dump(rf_model_amoxicillin, "rf_model_amoxicillin.joblib")
 dump(rf_model_atorvastatin, "rf_model_atorvastatin.joblib")
 dump(lgb_model_insulin_glargine, "lgb_model_insulin_glargine.joblib")
-dump(lgb_model_surgical_gloves_box, "trained_model.joblib")
-dump(xg_model_surgical_masks_box, "trained_model.joblib")        
+dump(lgb_model_surgical_gloves_box, "lgb_model_surgical_gloves_box.joblib")
+dump(xg_model_surgical_masks_box, "xg_model_surgical_masks_box.joblib")      
 
 
 
