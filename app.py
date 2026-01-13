@@ -20,9 +20,19 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.feature_selection import SelectFromModel
 from scipy import stats
+from fastapi.middleware.cors import CORSMiddleware
 
 # Initialize the FastAPI app
 app = FastAPI()
+
+# Allow CORS from your frontend (React or any other framework)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:8080"],  # Allow your frontend origin
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all HTTP methods (GET, POST, etc.)
+    allow_headers=["*"],  # Allow all headers
+)
 
 def inv_boxcox(y_transformed, lambda_value):
     if lambda_value == 0:
@@ -122,7 +132,7 @@ def calculation_logic(input1: str, input2: int):
     print(medicine_averagedf.columns)
     print(medicine_averagedf['week_of_month'])
     total_count=0
-    lambda_value=0.30454259734348804
+    
     price=0
     # print(merged_df_label_encoded.columns)
     # print(merged_df_label_encoded['month_And_day_of_month'])
@@ -176,15 +186,15 @@ def calculation_logic(input1: str, input2: int):
         print(week_of_the_month)
         print(month_of_the_year)
         print(week_of_the_year)
-        flu_index_average = float(sum(flu_index_values) / len(flu_index_values))
-        season_average = float(sum(season_values) / len(season_values))
-        week_of_the_year_max = float(max(set(week_of_the_year), key=week_of_the_year.count))
-        month_of_the_year_max= float(max(set(month_of_the_year), key=month_of_the_year.count))
-        week_of_the_month_max = float(max(set(week_of_the_month), key=week_of_the_month.count))
-        lag_1_average = float(sum(lag_1_values) / len(lag_1_values))
-        lag_7_average = float(sum(lag_7_values) / len(lag_7_values))
-        roll_mean_7_average = float(sum(roll_mean_7_values) / len(roll_mean_7_values))
-        roll_std_7_average = float(sum(roll_std_7_values) / len(roll_std_7_values))
+        flu_index_average = np.float64(sum(flu_index_values) / len(flu_index_values))
+        season_average = np.float64(sum(season_values) / len(season_values))
+        week_of_the_year_max = np.float64(max(set(week_of_the_year), key=week_of_the_year.count))
+        month_of_the_year_max= np.float64(max(set(month_of_the_year), key=month_of_the_year.count))
+        week_of_the_month_max = np.float64(max(set(week_of_the_month), key=week_of_the_month.count))
+        lag_1_average = np.float64(sum(lag_1_values) / len(lag_1_values))
+        lag_7_average = np.float64(sum(lag_7_values) / len(lag_7_values))
+        roll_mean_7_average = np.float64(sum(roll_mean_7_values) / len(roll_mean_7_values))
+        roll_std_7_average = np.float64(sum(roll_std_7_values) / len(roll_std_7_values))
         print("Averages:")
         print(f"Season Average: {season_average}")
         print(f"Flu Index Average: {flu_index_average}") 
@@ -198,44 +208,83 @@ def calculation_logic(input1: str, input2: int):
         pred=0
         if input1=="Amoxicillin_500mg":
             model = load("rf_model_amoxicillin.joblib")
-            prediction = model.predict([[flu_index_average, season_average, week_of_the_month_max,
-                                   month_of_the_year_max,
-                                   lag_1_average, lag_7_average,
-                                   roll_mean_7_average, roll_std_7_average ]])
+            X_new = pd.DataFrame({
+            'flu_alert_level': [flu_index_average],
+            'season': [season_average],
+            'week_of_month': [week_of_the_month_max],
+            'month': [month_of_the_year_max],
+            'lag_1': [lag_1_average],
+            'lag_7': [lag_7_average],
+            'roll_mean_7': [roll_mean_7_average],
+            'roll_std_7': [roll_std_7_average]
+           })
+            prediction = model.predict(X_new)
+            lambda_value=0.30454259734348804
             pred = inv_boxcox(prediction[0], lambda_value)
             print(f"Prediction for week {i+1}: {pred}")
         elif input1=="Atorvastatin_20mg":
             model = load("rf_model_atorvastatin.joblib")
-            prediction = model.predict([[flu_index_average, season_average, week_of_the_month_max,
-                                   month_of_the_year_max,
-                                   lag_1_average, lag_7_average,
-                                   roll_mean_7_average, roll_std_7_average ]])
+            X_new = pd.DataFrame({
+            'flu_alert_level': [flu_index_average],
+            'season': [season_average],
+            'week_of_month': [week_of_the_month_max],
+            'month': [month_of_the_year_max],
+            'lag_1': [lag_1_average],
+            'lag_7': [lag_7_average],
+            'roll_mean_7': [roll_mean_7_average],
+            'roll_std_7': [roll_std_7_average]
+           })
+            prediction = model.predict(X_new)
+            lambda_value=0.5565098068131767
             pred = inv_boxcox(prediction[0], lambda_value)
-            print(f"Prediction for week {i+1}: {pred}")
+            print(f"Prediction for week {i+1}: {prediction[0]}")
         elif input1=="Insulin_Glargine":
             model = load("lgb_model_insulin_glargine.joblib")
-            prediction = model.predict([[flu_index_average, season_average, week_of_the_month_max,
-                                   month_of_the_year_max,
-                                   lag_1_average, lag_7_average,
-                                   roll_mean_7_average, roll_std_7_average ]])
+            X_new = pd.DataFrame({
+            'flu_alert_level': [flu_index_average],
+            'season': [season_average],
+            'week_of_month': [week_of_the_month_max],
+            'month': [month_of_the_year_max],
+            'lag_1': [lag_1_average],
+            'lag_7': [lag_7_average],
+            'roll_mean_7': [roll_mean_7_average],
+            'roll_std_7': [roll_std_7_average]
+           })
+            prediction = model.predict(X_new)
             pred = np.expm1(prediction[0])
             print(f"Prediction for week {i+1}: {pred}")
         elif input1=="Surgical_Gloves_Box":
             model = load("lgb_model_surgical_gloves_box.joblib") 
-            prediction = model.predict([[flu_index_average, season_average, week_of_the_month_max,
-                                   month_of_the_year_max,
-                                   lag_1_average, lag_7_average,
-                                   roll_mean_7_average, roll_std_7_average ]])
+            X_new = pd.DataFrame({
+            'flu_alert_level': [flu_index_average],
+            'season': [season_average],
+            'week_of_month': [week_of_the_month_max],
+            'month': [month_of_the_year_max],
+            'lag_1': [lag_1_average],
+            'lag_7': [lag_7_average],
+            'roll_mean_7': [roll_mean_7_average],
+            'roll_std_7': [roll_std_7_average]
+           })
+            prediction = model.predict(X_new)
             pred = np.expm1(prediction[0])
-            print(f"Prediction for week {i+1}: {pred}")
+            print(f"Prediction for week {i+1}: {prediction[0]}")
         elif input1=="Surgical_Masks_Box":
             model = load("xg_model_surgical_masks_box.joblib")  
-            prediction = model.predict([[flu_index_average, season_average, week_of_the_month_max,
-                                   month_of_the_year_max,
-                                   lag_1_average, lag_7_average,
-                                   roll_mean_7_average, roll_std_7_average ]])
-            pred = inv_boxcox(prediction[0], lambda_value)
-            print(f"Prediction for week {i+1}: {pred}")     
+            print(model.feature_names_in_)
+            X_new = pd.DataFrame({
+            'flu_alert_level': [flu_index_average],
+            'season': [season_average],
+            'week_of_month': [week_of_the_month_max],
+            'month': [month_of_the_year_max],
+            'lag_1': [lag_1_average],
+            'lag_7': [lag_7_average],
+            'roll_mean_7': [roll_mean_7_average],
+            'roll_std_7': [roll_std_7_average]
+           })
+            prediction = model.predict(X_new)
+            lambda_value_0=1.5069560616989914
+            pred = inv_boxcox(prediction[0], lambda_value_0)
+            print(f"Prediction for week {i+1}: {prediction[0]}")     
         output1=pred*7
         total_count=total_count+output1
     return total_count, total_count*price
