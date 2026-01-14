@@ -1,6 +1,8 @@
+import string
 from fastapi import FastAPI
 from typing import Optional
 import pandas as pd
+from pydantic import BaseModel
 from sklearn.preprocessing import LabelEncoder
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -28,7 +30,7 @@ app = FastAPI()
 # Allow CORS from your frontend (React or any other framework)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8080"],  # Allow your frontend origin
+    allow_origins=["*"],  # Allow your frontend origin
     allow_credentials=True,
     allow_methods=["*"],  # Allow all HTTP methods (GET, POST, etc.)
     allow_headers=["*"],  # Allow all headers
@@ -39,8 +41,12 @@ def inv_boxcox(y_transformed, lambda_value):
         return np.exp(y_transformed)
     else:
         return (y_transformed * lambda_value + 1) ** (1 / lambda_value)
+    
+class PredictionRequest(BaseModel):
+    input1: str  # medicine name
+    input2: str  # duration (months)
 
-def calculation_logic(input1: str, input2: int):
+def calculation_logic(input1: str, input2: str):
     # Example logic: modify as needed
     # output1 = input1 * 2  # Example: multiply input1 by 2
     # output2 = input2 + 5  # Example: add 5 to input2
@@ -288,12 +294,11 @@ def calculation_logic(input1: str, input2: int):
         output1=pred*7
         total_count=total_count+output1
     return total_count, total_count*price
-# Define the GET route
-@app.get("/process")
-async def process_data(input1: str, input2: int):
+# Define the get route
+@app.get("/predict")
+async def process_data(input1: str, input2: str):
     # Perform some operations (you can replace this with your logic)
-    output1, output2 = calculation_logic(input1, input2)
-    
-    
+    output1, output2 = calculation_logic(input1, int(input2))
+    print(f"Output1: {output1}, Output2: {output2}")
     # Return the outputs as a dictionary (which FastAPI will return as JSON)
-    return {"output1": output1, "output2": output2}
+    return {"output1": int(output2), "output2": int(output1)}
